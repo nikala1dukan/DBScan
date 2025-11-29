@@ -784,6 +784,94 @@ T double_area(const vector<VEC<T>> &pol)
 
 // #define STRE
 
+vector<vector<int>> GetVectorOfAdjPnts(vector<VEC<ll>> &dots, ll eps) {
+    int n = dots.size();
+    vector<vector<int>> adj(n);
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = i+1; j < n; j++)
+        {
+            if ((dots[i] - dots[j]).dist2() <= eps) {
+                adj[i].push_back(j);
+                adj[j].push_back(i);
+            }
+        }
+    }
+
+    return adj;
+}
+
+void GoDFS(vector<int> &vtoc,
+    vector<bool> &used,
+    int &ccnt,
+    vector<vector<int>> &adj,
+    int minpts) {
+    int n = adj.size();
+    function<void(int)> dfs = [&](int start) {
+        vtoc[start] = ccnt;
+        used[start] = true;
+        for (int next : adj[start]) {
+            if (used[next] || adj[next].size() < minpts) continue;
+            dfs(next);
+        }
+    };
+
+    for (int i = 0; i < n; i++)
+    {
+        if (adj[i].size() >= minpts && !used[i]) {
+            dfs(i);
+            ++ccnt;
+        }
+    }
+}
+
+vector<set<int>> GetNearClusts(vector<int> &vtoc, vector<vector<int>> &adj, vector<VEC<ll>> &dots) {
+    int n = vtoc.size();
+
+    vector<ll> dst(n, LLONG_MAX);
+    vector<set<int>> nearclusts(n);
+    for (int i = 0; i < n; i++)
+    {
+        if (vtoc[i] != -1) {
+            for (int next : adj[i]) {
+                if (dst[next] == (dots[i] - dots[next]).dist2()) {
+                    nearclusts[next].insert(vtoc[i]);
+                } else if (dst[next] > (dots[i] - dots[next]).dist2()) {
+                    dst[next] = (dots[i] - dots[next]).dist2();
+                    nearclusts[next].clear();
+                    nearclusts[next].insert(vtoc[i]);
+                }
+            }
+        }
+    }
+
+    return nearclusts;
+}
+
+int GetNoiseCount(vector<int> &vtoc, vector<set<int>> nearclusts) {
+    int res = 0;
+    int n = vtoc.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (vtoc[i] == -1 && nearclusts[i].size() == 0) {
+            ++res;
+        }
+    }
+    return res;
+}
+
+int GetEdgyCount(vector<int> &vtoc, vector<set<int>> nearclusts) {
+    int res = 0;
+    int n = vtoc.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (vtoc[i] == -1 && nearclusts[i].size() > 0) {
+            ++res;
+        }
+    }
+    return res;
+}
+
 signed main()
 {
     ios::sync_with_stdio(false);
@@ -805,67 +893,15 @@ signed main()
         vector<VEC<ll>> dots(n);
         cin >> dots;
 
-        vector<vector<int>> adj(n);
-        for (int i = 0; i < n; i++)
-        {
-            for (int j = i+1; j < n; j++)
-            {
-                if ((dots[i] - dots[j]).dist2() <= eps) {
-                    adj[i].push_back(j);
-                    adj[j].push_back(i);
-                }
-            }
-        }
+        vector<vector<int>> adj = GetVectorOfAdjPnts(dots, eps);
 
         int ccnt = 0;
         vector<int> vtoc(n, -1);
         vector<bool> used(n, false);
-        function<void(int)> dfs = [&](int start) {
-            vtoc[start] = ccnt;
-            used[start] = true;
-            for (int next : adj[start]) {
-                if (used[next] || adj[next].size() < minpts) continue;
-                dfs(next);
-            }
-        };
+        GoDFS(vtoc, used, ccnt, adj, minpts);
+        vector<set<int>> nearclusts = GetNearClusts(vtoc, adj, dots);
 
-        for (int i = 0; i < n; i++)
-        {
-            if (adj[i].size() >= minpts && !used[i]) {
-                dfs(i);
-                ++ccnt;
-            }
-        }
-
-        vector<ll> dst(n, LLONG_MAX);
-        vector<set<int>> nearclusts(n);
-        for (int i = 0; i < n; i++)
-        {
-            if (vtoc[i] != -1) {
-                for (int next : adj[i]) {
-                    if (dst[next] == (dots[i] - dots[next]).dist2()) {
-                        nearclusts[next].insert(vtoc[i]);
-                    } else if (dst[next] > (dots[i] - dots[next]).dist2()) {
-                        dst[next] = (dots[i] - dots[next]).dist2();
-                        nearclusts[next].clear();
-                        nearclusts[next].insert(vtoc[i]);
-                    }
-                }
-            }
-        }
-        
-        int noise_cnt = 0;
-        int edgy_cnt = 0;
-        for (int i = 0; i < n; i++)
-        {
-            if (vtoc[i] == -1 && nearclusts[i].size() > 0) {
-                ++edgy_cnt;
-            } else if (vtoc[i] == -1 && nearclusts[i].size() == 0) {
-                ++noise_cnt;
-            }
-        }
-
-        cout << ccnt << ' ' << edgy_cnt << ' ' << noise_cnt << '\n';
+        cout << ccnt << ' ' << GetEdgyCount(vtoc, nearclusts) << ' ' << GetNoiseCount(vtoc, nearclusts) << '\n';
 
     }
     return 0;
